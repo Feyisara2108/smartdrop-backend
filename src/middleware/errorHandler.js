@@ -53,15 +53,25 @@ function errorHandler(err, req, res, _next) {
     status = err.statusCode;
     code = err.code;
     message = err.message;
+  } else if (err.isCircuitBreakerError || err.name === 'CircuitBreakerOpenError') {
+    status = 503;
+    code = 'SERVICE_UNAVAILABLE';
+    message = err.message || 'Service temporarily unavailable';
+    if (err.retryAfter) {
+      res.setHeader('Retry-After', String(err.retryAfter));
+    }
   } else if (isPayloadTooLarge) {
     status = 413;
     code = 'PAYLOAD_TOO_LARGE';
     message = 'Request body is too large';
   } else if (err.status || err.statusCode) {
     status = err.status || err.statusCode;
-    const STATUS_CODES = { 400: 'VALIDATION_ERROR', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 413: 'PAYLOAD_TOO_LARGE', 429: 'RATE_LIMITED' };
+    const STATUS_CODES = { 400: 'VALIDATION_ERROR', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 413: 'PAYLOAD_TOO_LARGE', 429: 'RATE_LIMITED', 503: 'SERVICE_UNAVAILABLE' };
     code = STATUS_CODES[status] || 'INTERNAL_ERROR';
     message = err.message || 'Request rejected';
+    if (err.retryAfter || err.retry_after) {
+      res.setHeader('Retry-After', String(err.retryAfter || err.retry_after));
+    }
   }
 
   // Clients switch on `code`, so an unregistered value would be a code they
@@ -92,6 +102,18 @@ function errorHandler(err, req, res, _next) {
     error.details = safeDetails;
   }
 
+  const { renderSafeErrorHtml } = require('../utils/htmlEscape');
+
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  if (req.accepts && req.accepts('html') && !req.accepts('json')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(status).send(
+      renderSafeErrorHtml({ title: code, message: safeMessage, statusCode: status })
+    );
+  }
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.status(status).json({ error });
 }
 

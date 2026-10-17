@@ -20,6 +20,8 @@ const {
   buildApiKeyRateLimit,
 } = require("./middleware/rateLimit");
 const { requestIdMiddleware } = require("./middleware/requestId");
+const { headerSecurityMiddleware } = require("./middleware/headerSecurity");
+const { docsCspMiddleware } = require("./middleware/csp");
 const requestLoggerMiddleware = require("./middleware/requestLogger");
 const {
   requireApiKey,
@@ -45,6 +47,7 @@ const healthRouter = require("./health");
 const priceWebSocket = require("./ws/priceWebSocket");
 const subscriptionManager = require("./ws/PriceSubscriptionManager");
 const webhookDispatcher = require("./services/webhookDispatcher");
+const { getAllBreakerStates } = require("./utils/circuitBreaker");
 
 // Wrap background jobs with leader-election coordination so that only one
 // replica across the deployment runs each job at any given time.
@@ -81,11 +84,29 @@ let server = {
   },
 };
 
+app.use(headerSecurityMiddleware);
 app.use(requestIdMiddleware);
 app.use(requestLoggerMiddleware);
 app.use(requestMetricsMiddleware);
 app.use(compression());
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    xContentTypeOptions: true,
+    xDownloadOptions: true,
+  })
+);
 app.use(buildCorsMiddleware(config.corsAllowedOrigins));
 // Apply a global body size limit to protect all routes from oversized payloads.
 // Individual routes with stricter limits (e.g. airdrops) override this via
@@ -177,6 +198,7 @@ app.get("/health", healthRateLimit, async (req, res) => {
     redis_connected: redisConnected,
     redis_unavailable: !redisConnected,
     circuits: priceOracle.getCircuitStates(),
+    circuit_breakers: getAllBreakerStates(),
     redis: {
       connected: redisConnected,
       command_queue_depth: redisQueueDepth,
@@ -328,6 +350,7 @@ app.use(
 );
 
 app.use("/api-docs", globalApiLimit);
+app.use("/api-docs", docsCspMiddleware);
 app.use("/api-docs", apiDocsRouter);
 app.use(metricsRouter);
 
