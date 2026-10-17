@@ -1,4 +1,5 @@
 const cors = require('cors');
+const config = require('../config');
 const AppError = require('../errors/AppError');
 
 function buildCorsMiddleware(allowedOrigins) {
@@ -13,10 +14,13 @@ function buildCorsMiddleware(allowedOrigins) {
       ));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Key', 'Idempotency-Key'],
-    exposedHeaders: ['X-Request-Id', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
-    maxAge: 86400,
+    methods: ['GET', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    // Issue #344: preflight (OPTIONS) responses carry Access-Control-Max-Age
+    // so browsers can cache the result instead of re-sending a preflight for
+    // every cross-origin POST. Window defaults to 24h and is tunable via
+    // CORS_MAX_AGE_SECONDS.
+    maxAge: config.corsMaxAgeSeconds,
   });
 }
 

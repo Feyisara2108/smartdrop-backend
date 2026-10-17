@@ -335,6 +335,11 @@ async function doFetchFreshPrice(assetCode, issuer = null, redisUnavailable = fa
  * Single-flight wrapper around doFetchFreshPrice. Concurrent calls for the
  * same assetCode:issuer pair while a fetch is already in-flight will await
  * the same promise instead of each independently hitting all upstream sources.
+ *
+ * Uses a wrapper promise pattern to ensure concurrent callers receive
+ * independent promise instances. This prevents the issue where a rejection
+ * from the original promise would propagate to all waiting callers, causing
+ * them to share the same rejection error.
  */
 async function fetchFreshPrice(assetCode, issuer = null, redisUnavailable = false) {
   const normalisedIssuer = issuer || null;
@@ -348,23 +353,29 @@ async function fetchFreshPrice(assetCode, issuer = null, redisUnavailable = fals
       issuer: normalisedIssuer,
       coalesced: coalescedCount,
     });
-    return existing;
+    return existing.promise;
   }
 
-  // Wrap the promise to handle rejections cleanly: on rejection, remove from
-  // inFlight and re-throw so concurrent callers see the same error (#286).
-  const promise = doFetchFreshPrice(assetCode, issuer, redisUnavailable)
-    .catch((err) => {
-      inFlight.delete(key);
-      throw err;
-    })
-    .then((result) => {
-      inFlight.delete(key);
-      return result;
-    });
+  // Each coalesced caller is handed its own wrapper promise (#417) so a
+  // rejection of the underlying fetch is forwarded into every waiter
+  // without the waiters sharing one rejection object. The single-flight
+  // entry is still removed exactly once when the underlying fetch settles
+  // (#286), whether it resolves or rejects.
+  let resolve;
+  let reject;
+  const wrapperPromise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
 
-  inFlight.set(key, promise);
-  return promise;
+  const actualPromise = doFetchFreshPrice(assetCode, issuer, redisUnavailable);
+
+  actualPromise
+    .then(resolve, reject)
+    .finally(() => inFlight.delete(key));
+
+  inFlight.set(key, { promise: wrapperPromise, actual: actualPromise });
+  return wrapperPromise;
 }
 
 async function refreshAllCachedPrices() {
@@ -404,6 +415,10 @@ async function refreshAllCachedPrices() {
 
   const refreshPromises = keys
     .map(async (key) => {
+      // Second line of defence behind the MATCH pattern above: a history key
+      // must never be refreshed as if it were an asset called "history".
+      if (key.startsWith(HISTORY_PREFIX)) return;
+
       const suffix = key.replace(CACHE_PREFIX, '');
       const parts = suffix.split(':');
       const assetCode = parts[0];
