@@ -180,7 +180,10 @@ async function list(page = 1, limit = 20) {
   const start = (page - 1) * limit;
   const end = start + limit - 1;
   const paginatedIds = await redis.zrevrange(IDS_KEY, start, end);
-  const airdrops = await Promise.all(paginatedIds.map((id) => cache.get(airdropKey(id))));
+  if (paginatedIds.length === 0) {
+    return { airdrops: [], total };
+  }
+  const airdrops = await cache.mget(paginatedIds.map(airdropKey));
 
   return { airdrops: airdrops.filter(Boolean), total };
 }
