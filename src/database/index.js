@@ -2,7 +2,12 @@
 
 const knexFactory = require('knex');
 const config = require('../config');
-const { withTransaction } = require('./transaction');
+const {
+  withTransaction,
+  isDeadlockOrSerializationError,
+  sortIds,
+  lockRows,
+} = require('./transaction');
 
 let db = null;
 
@@ -61,4 +66,7 @@ module.exports = {
   closeDb,
   withTransaction,
   transaction,
+  sortIds,
+  lockRows,
+  isDeadlockOrSerializationError,
 };
