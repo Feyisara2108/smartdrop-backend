@@ -142,13 +142,17 @@ function normalizeListOptions(limitOrOptions, statusArg) {
 
 async function listByWebhook(webhookId, limitOrOptions = 50, statusArg) {
   try {
-    const { limit, status } = normalizeListOptions(limitOrOptions, statusArg);
+    const { limit, status, offset } = normalizeListOptions(limitOrOptions, statusArg);
     const redis = cache.getClient();
-    const ids = await redis.zrevrange(indexKey(webhookId), 0, RECENT_DELIVERIES_LIMIT - 1);
+    // #447 — Use Redis range query with offset/limit for pagination instead
+    // of loading all IDs and filtering in JS.
+    const start = offset || 0;
+    const end = start + (limit || 50) - 1;
+    const ids = await redis.zrevrange(indexKey(webhookId), start, end);
     const records = await Promise.all(ids.map((id) => cache.get(key(id))));
     const deliveries = records.filter(Boolean);
     const filtered = status ? deliveries.filter((delivery) => delivery.status === status) : deliveries;
-    return filtered.slice(0, limit);
+    return filtered;
   } catch (err) {
     logger.error('deliveryRepository.listByWebhook Redis error', { webhookId, error: err.message });
     return [];
