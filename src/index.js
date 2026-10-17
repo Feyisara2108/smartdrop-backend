@@ -45,6 +45,7 @@ const healthRouter = require("./health");
 const priceWebSocket = require("./ws/priceWebSocket");
 const subscriptionManager = require("./ws/PriceSubscriptionManager");
 const webhookDispatcher = require("./services/webhookDispatcher");
+const { getAllBreakerStates } = require("./utils/circuitBreaker");
 
 // Wrap background jobs with leader-election coordination so that only one
 // replica across the deployment runs each job at any given time.
@@ -177,6 +178,7 @@ app.get("/health", healthRateLimit, async (req, res) => {
     redis_connected: redisConnected,
     redis_unavailable: !redisConnected,
     circuits: priceOracle.getCircuitStates(),
+    circuit_breakers: getAllBreakerStates(),
     redis: {
       connected: redisConnected,
       command_queue_depth: redisQueueDepth,
