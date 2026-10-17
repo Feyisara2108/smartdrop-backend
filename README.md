@@ -250,6 +250,7 @@ The application reads configurations from the `.env` file at the root.
 | `PRICE_ANOMALY_THRESHOLD` | Anomaly detection threshold % | 10 | No |
 | `ADMIN_API_KEY` | Bootstrap admin bearer token for API key management | undefined | Yes, for protected endpoints |
 | `LOG_LEVEL` | Logging level | info | No |
+| `API_DOCS_ENABLED` | Serve the OpenAPI specification and Swagger UI at `/api-docs` | true | No |
 
 | `WEBHOOK_MAX_ATTEMPTS` | Total delivery attempts (initial + retries) | 3 | No |
 | `WEBHOOK_RETRY_BASE_MS` | Base backoff between retries (ms) | 30000 | No |
@@ -290,6 +291,7 @@ Each price source (`stellar_dex`, `coingecko`, `coinmarketcap`) gets one circuit
 | `LEASE_TTL_MS` | Leader lease TTL in milliseconds — how long a lease is valid without renewal | 15000 | No |
 | `LEASE_RENEW_INTERVAL_MS` | How often the leader renews its lease (and followers check to acquire) | 5000 | No |
 | `LOG_LEVEL` | Logging level: `debug`, `info`, `warn`, or `error` | info | No |
+| `API_DOCS_ENABLED` | Serve the OpenAPI specification and Swagger UI at `/api-docs` | true | No |
 | `API_KEY_RATELIMIT_WINDOW_SECONDS` | Per-API-key rate-limit window in seconds | 60 | No |
 | `API_KEY_RATELIMIT_FREE_MAX` | Requests per window for `free`-tier keys | 100 | No |
 | `API_KEY_RATELIMIT_PRO_MAX` | Requests per window for `pro`-tier keys | 1000 | No |
@@ -482,6 +484,18 @@ needed when reconstructing what happened to a database.
 
 CI exercises the full up → rollback → up cycle against a real PostgreSQL
 service, and asserts that the production guard blocks destructive migrations.
+
+---
+
+## API Documentation
+
+Interactive OpenAPI documentation is served at `/api-docs`. The raw
+specification is also available as YAML at `/api-docs/openapi.yaml` and as
+JSON at `/api-docs/openapi.json`, so clients and code generators can consume
+it without scraping the UI.
+
+Set `API_DOCS_ENABLED=false` to disable all documentation routes in
+deployments where the API surface should not be discoverable.
 
 ---
 

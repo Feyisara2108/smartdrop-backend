@@ -134,6 +134,9 @@ const parsedWatchedAssets = Array.isArray(env.WATCHED_ASSETS)
 const config = module.exports = {
   nodeEnv: env.NODE_ENV,
   port: env.PORT,
+  apiDocs: {
+    enabled: process.env.API_DOCS_ENABLED !== 'false',
+  },
   databaseUrl: env.DATABASE_URL,
   redis: {
     url: env.REDIS_URL,
@@ -353,6 +356,9 @@ function reload() {
   Object.assign(config, {
     nodeEnv: reloaded.NODE_ENV,
     port: reloaded.PORT,
+    apiDocs: {
+      enabled: process.env.API_DOCS_ENABLED !== 'false',
+    },
     databaseUrl: reloaded.DATABASE_URL,
     redis: { url: reloaded.REDIS_URL },
     stellar: {
