@@ -241,6 +241,21 @@ const globalApiLimit = buildRateLimit({
   keyPrefix: "api",
 });
 
+// #451 — Global rate limit applied to ALL requests, not just /api/v1.
+// This prevents abuse of non-API routes (health, docs, etc.) as well.
+const globalRateLimit = buildRateLimit({
+  windowSeconds: Math.floor(config.rateLimit.windowMs / 1000),
+  max: config.rateLimit.max * 2, // More generous for non-API routes
+  keyPrefix: "global",
+});
+
+// #450 — Request validation middleware: rejects requests with invalid
+// Content-Type for POST/PUT/PATCH, and validates JSON body size limits.
+const requestValidationMiddleware = require("./middleware/requestValidation");
+
+app.use(globalRateLimit);
+app.use(requestValidationMiddleware);
+
 // Resolve any presented API key first so the per-key limiter can meter it,
 // then fall through to the IP-keyed limiter for unauthenticated callers.
 // Authentication itself is still enforced per-route by requireApiKey.
