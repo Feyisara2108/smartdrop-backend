@@ -40,6 +40,7 @@ const {
   router: metricsRouter,
   requestMetricsMiddleware,
 } = require("./routes/metrics");
+const healthRouter = require("./health");
 
 const priceWebSocket = require("./ws/priceWebSocket");
 const subscriptionManager = require("./ws/PriceSubscriptionManager");
@@ -111,6 +112,10 @@ async function readWebhookRetryQueueStats() {
     return EMPTY_QUEUE_STATS;
   }
 }
+
+// #455 — Mount healthRouter for unauthenticated, rate-limit-exempt
+// lightweight liveness (/health/live) and dependency readiness (/health/ready) checks.
+app.use("/health", healthRouter);
 
 const healthRateLimit = buildRateLimit({
   windowSeconds: Math.floor(config.rateLimit.windowMs / 1000),

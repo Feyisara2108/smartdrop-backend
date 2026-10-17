@@ -80,6 +80,7 @@ const env = cleanEnv(rawEnv, {
   LEASE_TTL_MS: positiveInteger({ default: 15000 }),
   LEASE_RENEW_INTERVAL_MS: positiveInteger({ default: 5000 }),
   ADMIN_API_KEY: str({ default: '' }),
+  BCRYPT_ROUNDS: positiveInteger({ default: 12 }),
   // 32-byte AES-256 key for encrypting webhook secrets at rest (issue #145),
   // hex or base64 encoded. Empty in dev — webhookEncryption falls back to an
   // insecure fixed key and logs a warning; production must set this.
@@ -219,6 +220,7 @@ const config = module.exports = {
   },
   auth: {
     adminApiKey: env.ADMIN_API_KEY,
+    bcryptRounds: env.BCRYPT_ROUNDS,
   },
   apiKeyRateLimit: {
     windowSeconds: env.API_KEY_RATELIMIT_WINDOW_SECONDS,
@@ -336,6 +338,7 @@ function reload() {
     API_KEY_RATELIMIT_FREE_MAX: positiveInteger({ default: 100 }),
     API_KEY_RATELIMIT_PRO_MAX: positiveInteger({ default: 1000 }),
     API_KEY_RATELIMIT_ADMIN_MAX: positiveInteger({ default: 10000 }),
+    BCRYPT_ROUNDS: positiveInteger({ default: 12 }),
   });
 
   const reloadedUsdcIssuer = reloaded.USDC_ISSUER;
@@ -354,7 +357,10 @@ function reload() {
       sorobanRpcUrl: reloaded.SOROBAN_RPC_URL,
       usdcIssuer: reloadedUsdcIssuer,
     },
-    auth: { adminApiKey: reloaded.ADMIN_API_KEY },
+    auth: {
+      adminApiKey: reloaded.ADMIN_API_KEY,
+      bcryptRounds: reloaded.BCRYPT_ROUNDS,
+    },
     // Issue #373: reload() already re-validated COINMARKETCAP_API_KEY above
     // (it's in the env schema passed to validateEnv) but never applied it —
     // config.coinmarketcap was silently left out of this Object.assign

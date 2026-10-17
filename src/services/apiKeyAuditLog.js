@@ -1,19 +1,5 @@
-const knex = require('knex');
-const config = require('../config');
+const { getDb } = require('../database');
 const logger = require('../logger');
-
-let db = null;
-
-function getDb() {
-  if (!db) {
-    db = knex({
-      client: 'pg',
-      connection: config.databaseUrl,
-      pool: { min: 2, max: 10 },
-    });
-  }
-  return db;
-}
 
 /**
  * Log API key usage to audit trail
@@ -25,14 +11,15 @@ function getDb() {
  * @param {number} options.statusCode - HTTP response status code
  * @param {number} options.responseTimeMs - Request duration in milliseconds
  */
-async function logUsage({ keyId, endpoint, ipAddress, statusCode, responseTimeMs }) {
+async function logUsage({ keyId, endpoint, ipAddress, statusCode, responseTimeMs }, trx) {
   try {
     if (!keyId || keyId === 'admin') {
       // Skip logging for admin key or missing key
       return;
     }
 
-    await getDb()('api_key_audit_logs').insert({
+    const client = trx || getDb();
+    await client('api_key_audit_logs').insert({
       key_id: keyId,
       endpoint,
       ip_address: ipAddress,
@@ -56,11 +43,13 @@ async function logUsage({ keyId, endpoint, ipAddress, statusCode, responseTimeMs
  * @param {string} keyId - The API key ID
  * @param {number} limit - Maximum number of entries to return
  * @param {number} offset - Number of entries to skip
+ * @param {import('knex').Knex.Transaction} [trx] - Optional transaction client
  * @returns {Promise<Array>} Audit log entries
  */
-async function getKeyAuditLog(keyId, limit = 100, offset = 0) {
+async function getKeyAuditLog(keyId, limit = 100, offset = 0, trx) {
   try {
-    return await getDb()('api_key_audit_logs')
+    const client = trx || getDb();
+    return await client('api_key_audit_logs')
       .where('key_id', keyId)
       .orderBy('created_at', 'desc')
       .limit(limit)
@@ -79,11 +68,13 @@ async function getKeyAuditLog(keyId, limit = 100, offset = 0) {
  * 
  * @param {number} limit - Maximum number of entries to return
  * @param {number} offset - Number of entries to skip
+ * @param {import('knex').Knex.Transaction} [trx] - Optional transaction client
  * @returns {Promise<Array>} Audit log entries
  */
-async function getAllAuditLogs(limit = 100, offset = 0) {
+async function getAllAuditLogs(limit = 100, offset = 0, trx) {
   try {
-    return await getDb()('api_key_audit_logs')
+    const client = trx || getDb();
+    return await client('api_key_audit_logs')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);

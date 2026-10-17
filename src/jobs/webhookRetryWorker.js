@@ -36,11 +36,7 @@ async function tick() {
       const attemptStartedAt = Date.now();
       try {
         await dispatcher.attempt(id);
-        health.totalRetriesProcessed++;
-        health.totalRetryLatencyMs += Date.now() - startMs;
       } catch (err) {
-        health.totalRetriesProcessed++;
-        health.totalRetryLatencyMs += Date.now() - startMs;
         logger.error('Retry attempt failed', { delivery_id: id, error: err.message });
       }
       // Latency is recorded for failed attempts too — a retry that times
