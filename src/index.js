@@ -21,7 +21,10 @@ const {
 } = require("./middleware/rateLimit");
 const { requestIdMiddleware } = require("./middleware/requestId");
 const { headerSecurityMiddleware } = require("./middleware/headerSecurity");
-const { docsCspMiddleware } = require("./middleware/csp");
+const {
+  API_CSP_DIRECTIVES,
+  docsCspMiddleware,
+} = require("./middleware/csp");
 const requestLoggerMiddleware = require("./middleware/requestLogger");
 const {
   requireApiKey,
@@ -92,15 +95,8 @@ app.use(compression());
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
-        imgSrc: ["'self'", "data:"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        frameAncestors: ["'none'"],
-      },
+      useDefaults: false,
+      directives: API_CSP_DIRECTIVES,
     },
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     xContentTypeOptions: true,
