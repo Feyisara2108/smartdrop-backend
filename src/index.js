@@ -290,6 +290,9 @@ function shutdown(signal) {
       ws_connections: wsConnections,
     });
 
+    // Stop accepting new connections immediately.
+    if (server) server.close();
+
     // Stop leader-aware jobs (releases leases gracefully)
     await wrappedPriceRefreshJob.stop();
     await wrappedWebhookRetryWorker.stop();
@@ -312,7 +315,20 @@ function shutdown(signal) {
     // then force-close any still open after the drain timeout (issue #248).
     await subscriptionManager.drain(5000);
 
-    if (server) server.close();
+    // Wait for in-flight requests to complete (max 10s) before force-closing.
+    await new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 10_000);
+      if (server) {
+        server.close(() => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      } else {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+
     await cache.disconnect();
     process.exit(0);
   };
