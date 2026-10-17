@@ -20,6 +20,8 @@ const {
   buildApiKeyRateLimit,
 } = require("./middleware/rateLimit");
 const { requestIdMiddleware } = require("./middleware/requestId");
+const { headerSecurityMiddleware } = require("./middleware/headerSecurity");
+const { docsCspMiddleware } = require("./middleware/csp");
 const requestLoggerMiddleware = require("./middleware/requestLogger");
 const {
   requireApiKey,
@@ -82,11 +84,29 @@ let server = {
   },
 };
 
+app.use(headerSecurityMiddleware);
 app.use(requestIdMiddleware);
 app.use(requestLoggerMiddleware);
 app.use(requestMetricsMiddleware);
 app.use(compression());
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    xContentTypeOptions: true,
+    xDownloadOptions: true,
+  })
+);
 app.use(buildCorsMiddleware(config.corsAllowedOrigins));
 // Apply a global body size limit to protect all routes from oversized payloads.
 // Individual routes with stricter limits (e.g. airdrops) override this via
@@ -282,6 +302,7 @@ app.use("/api/v1/webhooks", requireApiKey({ scopes: ["webhooks"] }));
 app.use("/api/v1", webhooksRouter);
 app.use("/api/v1", airdropsRouter);
 app.use("/api-docs", globalApiLimit);
+app.use("/api-docs", docsCspMiddleware);
 app.use("/api-docs", apiDocsRouter);
 app.use(metricsRouter);
 

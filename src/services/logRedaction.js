@@ -53,10 +53,12 @@ function redactQuerySecrets(value) {
   return value.replace(QUERY_SECRET_RE, '$1[REDACTED]');
 }
 
-// Scan a string value for secret *shapes* regardless of the key it sits under.
+// Scan a string value for secret *shapes* regardless of the key it sits under,
+// and escape CR and LF to prevent log injection / log splitting (Issue #499).
 function scanString(value) {
   let out = redactWhsec(value);
   out = redactQuerySecrets(out);
+  out = out.replace(/\r/g, '\\r').replace(/\n/g, '\\n');
   return out;
 }
 

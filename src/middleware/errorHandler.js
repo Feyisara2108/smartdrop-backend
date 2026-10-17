@@ -87,6 +87,18 @@ function errorHandler(err, req, res, _next) {
     error.details = safeDetails;
   }
 
+  const { renderSafeErrorHtml } = require('../utils/htmlEscape');
+
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  if (req.accepts && req.accepts('html') && !req.accepts('json')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(status).send(
+      renderSafeErrorHtml({ title: code, message: safeMessage, statusCode: status })
+    );
+  }
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.status(status).json({ error });
 }
 
