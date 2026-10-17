@@ -264,21 +264,69 @@ const requestValidationMiddleware = require("./middleware/requestValidation");
 app.use(globalRateLimit);
 app.use(requestValidationMiddleware);
 
-// Resolve any presented API key first so the per-key limiter can meter it,
-// then fall through to the IP-keyed limiter for unauthenticated callers.
-// Authentication itself is still enforced per-route by requireApiKey.
-app.use("/api/v1", attachApiKey());
-app.use("/api/v1", auditApiKeyUsage());
-app.use("/api/v1", apiKeyLimit);
-app.use("/api/v1", globalApiLimit);
-app.use("/api/v1", pricesRouter);
-app.use("/api/v1", keysRouter);
-app.use("/api/v1/alerts", requireApiKey({ scopes: ["alerts"] }));
-app.use("/api/v1", alertsRouter);
-app.use("/api/v1", indexerRouter);
-app.use("/api/v1/webhooks", requireApiKey({ scopes: ["webhooks"] }));
-app.use("/api/v1", webhooksRouter);
-app.use("/api/v1", airdropsRouter);
+// ==================== API ROUTING & VERSIONING (#460) ====================
+// Build the core v1 API router.
+const apiV1Router = express.Router();
+apiV1Router.use(attachApiKey());
+apiV1Router.use(auditApiKeyUsage());
+apiV1Router.use(apiKeyLimit);
+apiV1Router.use(globalApiLimit);
+apiV1Router.use(pricesRouter);
+apiV1Router.use(keysRouter);
+apiV1Router.use("/alerts", requireApiKey({ scopes: ["alerts"] }));
+apiV1Router.use(alertsRouter);
+apiV1Router.use(indexerRouter);
+apiV1Router.use("/webhooks", requireApiKey({ scopes: ["webhooks"] }));
+apiV1Router.use(webhooksRouter);
+apiV1Router.use(airdropsRouter);
+
+// Unknown version rejection: return clear 404 for unsupported versions (e.g. /v99/..., /api/v99/...)
+app.use((req, res, next) => {
+  const versionMatch = req.path.match(/^\/(?:api\/)?v(\d+)(?:\/|$)/i);
+  if (versionMatch && versionMatch[1] !== "1") {
+    const requestedVersion = `v${versionMatch[1]}`;
+    return next(
+      new AppError(
+        "NOT_FOUND",
+        `API version '${requestedVersion}' is not supported. Supported versions: v1`,
+        404,
+        { requested_version: requestedVersion, supported_versions: ["v1"] },
+      ),
+    );
+  }
+  next();
+});
+
+// Primary versioned path: /v1/...
+app.use("/v1", apiV1Router);
+
+// Versioned path alias: /api/v1/... (preserves existing API clients)
+app.use("/api/v1", apiV1Router);
+
+// Deprecation signal for legacy unversioned paths (Deprecation and Sunset headers + warn log)
+function legacyDeprecationMiddleware(req, res, next) {
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Sunset", "Fri, 01 Jan 2027 00:00:00 GMT");
+  logger.warn("Legacy unversioned API path accessed", {
+    path: req.originalUrl,
+    method: req.method,
+    suggestion: "Please migrate to versioned endpoints under /v1 or /api/v1",
+  });
+  next();
+}
+
+// Backward-compatible unversioned API mounts: /api/... and direct resource paths
+const legacyApiRouter = express.Router();
+legacyApiRouter.use(legacyDeprecationMiddleware);
+legacyApiRouter.use(apiV1Router);
+
+app.use("/api", legacyApiRouter);
+app.use(
+  ["/prices", "/keys", "/alerts", "/airdrops", "/webhooks", "/recipients", "/indexer"],
+  legacyDeprecationMiddleware,
+  apiV1Router,
+);
+
 app.use("/api-docs", globalApiLimit);
 app.use("/api-docs", apiDocsRouter);
 app.use(metricsRouter);
