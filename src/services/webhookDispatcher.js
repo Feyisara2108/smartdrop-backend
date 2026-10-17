@@ -288,8 +288,9 @@ async function getWebhookForAttempt(webhookId) {
  */
 function backoffMs(attemptsCompleted, options = {}) {
   const random = options.random || Math.random;
-  const base = config.webhooks.retryBaseMs;
-  const factor = config.webhooks.retryFactor;
+  // Per-webhook overrides fall back to global config (#487).
+  const base = options.retryBaseMs ?? config.webhooks.retryBaseMs;
+  const factor = options.retryFactor ?? config.webhooks.retryFactor;
   const deterministicDelay = base * factor ** (attemptsCompleted - 1);
   const half = deterministicDelay / 2;
   return half + random() * half;
@@ -460,7 +461,9 @@ async function attempt(deliveryId, sequence) {
 
     const errorMessage = networkError || `HTTP ${responseStatus}`;
     const retryable = shouldRetry(responseStatus, Boolean(networkError));
-    const hasAttemptsLeft = attempts < config.webhooks.maxAttempts;
+    // Per-webhook max attempts override, falling back to global config (#487).
+    const webhookMaxAttempts = webhook.max_attempts ?? config.webhooks.maxAttempts;
+    const hasAttemptsLeft = attempts < webhookMaxAttempts;
 
     if (retryable && hasAttemptsLeft) {
       recordDeliveryEnd(deliveryId, webhook.id, {

@@ -5,6 +5,21 @@ const logger = require('../logger');
 const errorTracker = require('../services/errorTracker');
 
 /**
+ * Standardized error response format (#491).
+ *
+ * All error responses use: `{ error: { code, message, request_id, details? } }`
+ * Use `sendError(res, status, code, message, details)` from route handlers
+ * to ensure consistency with the centralized errorHandler.
+ */
+function sendError(res, status, code, message, details) {
+  const error = { code, message, request_id: res.req?.id };
+  if (details && Object.keys(details).length > 0) {
+    error.details = details;
+  }
+  return res.status(status).json({ error });
+}
+
+/**
  * Strip any stack-trace-like content from an error message (#449).
  * Stack traces contain file paths, line numbers, and internal method
  * names that should never reach the client.
@@ -102,4 +117,4 @@ function errorHandler(err, req, res, _next) {
   res.status(status).json({ error });
 }
 
-module.exports = { errorHandler, notFoundHandler };
+module.exports = { errorHandler, notFoundHandler, sendError };

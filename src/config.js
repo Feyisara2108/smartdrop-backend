@@ -253,6 +253,9 @@ const config = module.exports = {
     max: parseInt(process.env.PRICE_RATELIMIT_MAX, 10) || 30,
   },
   webhooks: {
+    // Global defaults; per-webhook overrides can be set via the
+    // WEBHOOK_RETRY_BASE_MS, WEBHOOK_RETRY_FACTOR, WEBHOOK_MAX_ATTEMPTS
+    // env vars (#487).
     maxAttempts: parseInt(process.env.WEBHOOK_MAX_ATTEMPTS, 10) || 3,
     retryBaseMs: parseInt(process.env.WEBHOOK_RETRY_BASE_MS, 10) || 30000,
     retryFactor: parseFloat(process.env.WEBHOOK_RETRY_FACTOR) || 2,
