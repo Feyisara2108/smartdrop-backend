@@ -26,6 +26,7 @@ const {
   docsCspMiddleware,
 } = require("./middleware/csp");
 const requestLoggerMiddleware = require("./middleware/requestLogger");
+const { createStaticAssetsMiddleware } = require("./middleware/staticAssets");
 const {
   requireApiKey,
   attachApiKey,
@@ -281,6 +282,7 @@ const requestValidationMiddleware = require("./middleware/requestValidation");
 
 app.use(globalRateLimit);
 app.use(requestValidationMiddleware);
+app.use("/static", createStaticAssetsMiddleware(config.staticAssets));
 
 // ==================== API ROUTING & VERSIONING (#460) ====================
 // Build the core v1 API router.

@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const { cleanEnv, makeValidator, num, port, str, url } = require('envalid');
 
 const stellarAddress = makeValidator((input) => {
@@ -51,6 +52,16 @@ const positiveInteger = makeValidator((input) => {
   return value;
 });
 
+const optionalHttpUrl = makeValidator((input) => {
+  const value = String(input || '').trim();
+  if (!value) return '';
+  const parsed = new URL(value);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('must be an http or https URL');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+});
+
 const databaseDevDefault =
   process.env.NODE_ENV === 'test'
     ? 'postgres://localhost/smartdrop_test'
@@ -90,6 +101,9 @@ const env = cleanEnv(rawEnv, {
   AIRDROP_RATELIMIT_WINDOW: positiveInteger({ default: 60 }),
   AIRDROP_RATELIMIT_MAX: positiveInteger({ default: 10 }),
   CORS_MAX_AGE_SECONDS: positiveInteger({ default: 86400 }),
+  STATIC_ASSETS_DIR: str({ default: 'public' }),
+  STATIC_CDN_URL: optionalHttpUrl({ default: '' }),
+  STATIC_ASSETS_MAX_AGE_SECONDS: positiveInteger({ default: 31536000 }),
   PRICE_CACHE_TTL_SECONDS: num({ default: 60 }),
   PRICE_REFRESH_INTERVAL_SECONDS: num({ default: 30 }),
   PRICE_STALE_THRESHOLD_MINUTES: num({ default: 5 }),
@@ -136,6 +150,11 @@ const config = module.exports = {
   port: env.PORT,
   apiDocs: {
     enabled: process.env.API_DOCS_ENABLED !== 'false',
+  },
+  staticAssets: {
+    directory: path.resolve(env.STATIC_ASSETS_DIR),
+    cdnBaseUrl: env.STATIC_CDN_URL,
+    maxAgeSeconds: env.STATIC_ASSETS_MAX_AGE_SECONDS,
   },
   databaseUrl: env.DATABASE_URL,
   redis: {
@@ -319,6 +338,9 @@ function reload() {
     AIRDROP_RATELIMIT_WINDOW: positiveInteger({ default: 60 }),
     AIRDROP_RATELIMIT_MAX: positiveInteger({ default: 10 }),
     CORS_MAX_AGE_SECONDS: positiveInteger({ default: 86400 }),
+    STATIC_ASSETS_DIR: str({ default: 'public' }),
+    STATIC_CDN_URL: optionalHttpUrl({ default: '' }),
+    STATIC_ASSETS_MAX_AGE_SECONDS: positiveInteger({ default: 31536000 }),
     PRICE_CACHE_TTL_SECONDS: num({ default: 60 }),
     PRICE_REFRESH_INTERVAL_SECONDS: num({ default: 30 }),
     PRICE_STALE_THRESHOLD_MINUTES: num({ default: 5 }),
@@ -358,6 +380,11 @@ function reload() {
     port: reloaded.PORT,
     apiDocs: {
       enabled: process.env.API_DOCS_ENABLED !== 'false',
+    },
+    staticAssets: {
+      directory: path.resolve(reloaded.STATIC_ASSETS_DIR),
+      cdnBaseUrl: reloaded.STATIC_CDN_URL,
+      maxAgeSeconds: reloaded.STATIC_ASSETS_MAX_AGE_SECONDS,
     },
     databaseUrl: reloaded.DATABASE_URL,
     redis: { url: reloaded.REDIS_URL },

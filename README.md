@@ -251,6 +251,9 @@ The application reads configurations from the `.env` file at the root.
 | `ADMIN_API_KEY` | Bootstrap admin bearer token for API key management | undefined | Yes, for protected endpoints |
 | `LOG_LEVEL` | Logging level | info | No |
 | `API_DOCS_ENABLED` | Serve the OpenAPI specification and Swagger UI at `/api-docs` | true | No |
+| `STATIC_ASSETS_DIR` | Directory served at `/static` when no CDN is configured | public | No |
+| `STATIC_CDN_URL` | CDN origin used to redirect `/static/*` requests | empty | No |
+| `STATIC_ASSETS_MAX_AGE_SECONDS` | Cache lifetime for locally served static assets | 31536000 | No |
 
 | `WEBHOOK_MAX_ATTEMPTS` | Total delivery attempts (initial + retries) | 3 | No |
 | `WEBHOOK_RETRY_BASE_MS` | Base backoff between retries (ms) | 30000 | No |
@@ -292,6 +295,9 @@ Each price source (`stellar_dex`, `coingecko`, `coinmarketcap`) gets one circuit
 | `LEASE_RENEW_INTERVAL_MS` | How often the leader renews its lease (and followers check to acquire) | 5000 | No |
 | `LOG_LEVEL` | Logging level: `debug`, `info`, `warn`, or `error` | info | No |
 | `API_DOCS_ENABLED` | Serve the OpenAPI specification and Swagger UI at `/api-docs` | true | No |
+| `STATIC_ASSETS_DIR` | Directory served at `/static` when no CDN is configured | public | No |
+| `STATIC_CDN_URL` | CDN origin used to redirect `/static/*` requests | empty | No |
+| `STATIC_ASSETS_MAX_AGE_SECONDS` | Cache lifetime for locally served static assets | 31536000 | No |
 | `API_KEY_RATELIMIT_WINDOW_SECONDS` | Per-API-key rate-limit window in seconds | 60 | No |
 | `API_KEY_RATELIMIT_FREE_MAX` | Requests per window for `free`-tier keys | 100 | No |
 | `API_KEY_RATELIMIT_PRO_MAX` | Requests per window for `pro`-tier keys | 1000 | No |
@@ -496,6 +502,18 @@ it without scraping the UI.
 
 Set `API_DOCS_ENABLED=false` to disable all documentation routes in
 deployments where the API surface should not be discoverable.
+
+## Static Assets
+
+Files under `STATIC_ASSETS_DIR` (default `public/`) are served at `/static`
+with a long-lived immutable cache policy. Set `STATIC_CDN_URL` to the CDN
+origin to take the application out of the asset path: requests to `/static/*`
+are then redirected to the CDN instead of being served locally. The directory
+is still used in development, where no CDN is configured.
+
+Every API response carries a restrictive `Content-Security-Policy` header that
+denies browser resources by default. The `/api-docs` route overrides it with a
+policy that permits the inline assets Swagger UI needs.
 
 ---
 
