@@ -355,36 +355,18 @@ function withDeliveryTrace(traceId, fn) {
 }
 
 /**
- * #292 — Transient network errors (DNS blip, TCP reset, ECONNRESET) should
- * not immediately fail a delivery. Retry up to 2 additional times with
- * short exponential backoff before giving up to the caller, which has its
- * own retry/backoff layer. This only covers true network errors, not HTTP
- * error status codes (those are handled by the caller's shouldRetry logic).
+ * Single HTTP POST attempt. The caller's retry/backoff layer (backoffMs)
+ * handles retries with proper exponential backoff — this function makes
+ * exactly one attempt and returns or throws (#446).
  */
 async function postOnce(url, headers, body, timeoutMs) {
-  const maxAttempts = 3;
-  const baseDelay = 200;
-  let lastError;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await axios.post(url, body, {
-        headers,
-        timeout: timeoutMs ?? config.webhooks.timeoutMs,
-        transformRequest: [(data) => data],
-        validateStatus: () => true,
-        maxRedirects: 0,
-      });
-    } catch (err) {
-      lastError = err;
-      // Only retry on network errors, not HTTP errors (validateStatus catches those)
-      if (attempt < maxAttempts) {
-        const delay = baseDelay * 2 ** (attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-  throw lastError;
+  return axios.post(url, body, {
+    headers,
+    timeout: timeoutMs ?? config.webhooks.timeoutMs,
+    transformRequest: [(data) => data],
+    validateStatus: () => true,
+    maxRedirects: 0,
+  });
 }
 
 async function attempt(deliveryId, sequence) {
