@@ -22,8 +22,12 @@ const {
 } = require("./middleware/rateLimit");
 const { requestIdMiddleware } = require("./middleware/requestId");
 const { headerSecurityMiddleware } = require("./middleware/headerSecurity");
-const { docsCspMiddleware } = require("./middleware/csp");
+const {
+  API_CSP_DIRECTIVES,
+  docsCspMiddleware,
+} = require("./middleware/csp");
 const requestLoggerMiddleware = require("./middleware/requestLogger");
+const { createStaticAssetsMiddleware } = require("./middleware/staticAssets");
 const {
   requireApiKey,
   attachApiKey,
@@ -93,15 +97,8 @@ app.use(compression());
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
-        imgSrc: ["'self'", "data:"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        frameAncestors: ["'none'"],
-      },
+      useDefaults: false,
+      directives: API_CSP_DIRECTIVES,
     },
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     xContentTypeOptions: true,
@@ -286,6 +283,7 @@ const requestValidationMiddleware = require("./middleware/requestValidation");
 
 app.use(globalRateLimit);
 app.use(requestValidationMiddleware);
+app.use("/static", createStaticAssetsMiddleware(config.staticAssets));
 
 // ==================== API ROUTING & VERSIONING (#460) ====================
 // Build the core v1 API router.
