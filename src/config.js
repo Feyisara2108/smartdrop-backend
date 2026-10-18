@@ -303,6 +303,13 @@ const config = module.exports = {
     jitterMs: parseInt(process.env.CACHE_WARM_JITTER_MS, 10) || 0,
     lockTtlMs: parseInt(process.env.CACHE_WARM_LOCK_TTL_MS, 10) || 60000,
   },
+  trustProxy: (process.env.TRUST_PROXY || 'false').toLowerCase() === 'true',
+  cookies: {
+    secure: (process.env.COOKIE_SECURE || 'auto').toLowerCase(),
+    sameSite: (process.env.COOKIE_SAME_SITE || 'Strict'),
+    path: (process.env.COOKIE_PATH || '/'),
+    domain: process.env.COOKIE_DOMAIN || undefined,
+  },
 };
 
 
@@ -418,6 +425,13 @@ function reload() {
     concurrency: parseInt(process.env.CACHE_WARM_CONCURRENCY, 10) || 8,
     jitterMs: parseInt(process.env.CACHE_WARM_JITTER_MS, 10) || 0,
     lockTtlMs: parseInt(process.env.CACHE_WARM_LOCK_TTL_MS, 10) || 60000,
+  },
+  trustProxy: (process.env.TRUST_PROXY || 'false').toLowerCase() === 'true',
+  cookies: {
+    secure: (process.env.COOKIE_SECURE || 'auto').toLowerCase(),
+    sameSite: (process.env.COOKIE_SAME_SITE || 'Strict'),
+    path: (process.env.COOKIE_PATH || '/'),
+    domain: process.env.COOKIE_DOMAIN || undefined,
   },
   LOG_LEVEL: reloaded.LOG_LEVEL,
 });

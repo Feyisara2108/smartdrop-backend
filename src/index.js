@@ -9,6 +9,7 @@ const { assertUtcTimeZone } = require("./utils/dates");
 const timeZoneState = assertUtcTimeZone();
 
 const express = require("express");
+const config = require("./config");
 const compression = require("compression");
 const helmet = require("helmet");
 const config = require("./config");
@@ -86,6 +87,14 @@ const wrappedAirdropExpiryJob = makeLeaderAwareJob({
 });
 
 const app = express();
+
+// Issue #496 — secure cookies require trust proxy to reflect original
+// protocol when behind a load balancer/reverse proxy. Default is `false`
+// (explicit, to avoid rate-limit/IP spoofing if ever used). The config
+// exposes TRUST_PROXY; enable only if the deployment is proxy-fronted.
+if (typeof config.trustProxy === 'boolean') {
+  app.set('trust proxy', config.trustProxy);
+}
 let server = {
   close(callback) {
     if (callback) callback();
