@@ -20,6 +20,7 @@ const priceOracle = require("./services/priceOracle");
 const priceRefreshJob = require("./jobs/priceRefresh");
 const webhookRetryWorker = require("./jobs/webhookRetryWorker");
 const airdropExpiryJob = require("./jobs/airdropExpiry");
+const jobQueue = require("./services/jobQueue");
 const { createLeaderElection } = require("./services/leaderElection");
 const { makeLeaderAwareJob } = require("./jobs/leaderAwareJob");
 const { warmCacheInBackground, getWarmStatus } = require("./startup/cacheWarm");
@@ -30,8 +31,12 @@ const {
 } = require("./middleware/rateLimit");
 const { requestIdMiddleware } = require("./middleware/requestId");
 const { headerSecurityMiddleware } = require("./middleware/headerSecurity");
-const { docsCspMiddleware } = require("./middleware/csp");
+const {
+  API_CSP_DIRECTIVES,
+  docsCspMiddleware,
+} = require("./middleware/csp");
 const requestLoggerMiddleware = require("./middleware/requestLogger");
+const { createStaticAssetsMiddleware } = require("./middleware/staticAssets");
 const {
   requireApiKey,
   attachApiKey,
@@ -109,15 +114,8 @@ app.use(compression());
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'"],
-        imgSrc: ["'self'", "data:"],
-        objectSrc: ["'none'"],
-        baseUri: ["'self'"],
-        frameAncestors: ["'none'"],
-      },
+      useDefaults: false,
+      directives: API_CSP_DIRECTIVES,
     },
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     xContentTypeOptions: true,
@@ -305,6 +303,7 @@ const requestValidationMiddleware = require("./middleware/requestValidation");
 
 app.use(globalRateLimit);
 app.use(requestValidationMiddleware);
+app.use("/static", createStaticAssetsMiddleware(config.staticAssets));
 
 // ==================== API ROUTING & VERSIONING (#460) ====================
 // Build the core v1 API router.
@@ -406,6 +405,7 @@ function shutdown(signal) {
 
     // Stop non-leader-elected services
     await indexerPoller.stop();
+    jobQueue.stop();
 
     // Gracefully drain WebSocket connections: broadcast close frame,
     // then force-close any still open after the drain timeout (issue #248).
@@ -545,6 +545,9 @@ async function startServer() {
     // Indexer poller is not leader-elected (it uses its own cursor-based
     // persistence in Redis and is safe for multiple replicas to run).
     indexerPoller.start();
+
+    // #510 — start async job queue for background task processing
+    jobQueue.start();
   });
 
   return server;

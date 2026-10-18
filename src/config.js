@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const { cleanEnv, makeValidator, num, port, str, url } = require('envalid');
 
 const stellarAddress = makeValidator((input) => {
@@ -51,6 +52,16 @@ const positiveInteger = makeValidator((input) => {
   return value;
 });
 
+const optionalHttpUrl = makeValidator((input) => {
+  const value = String(input || '').trim();
+  if (!value) return '';
+  const parsed = new URL(value);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('must be an http or https URL');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+});
+
 const databaseDevDefault =
   process.env.NODE_ENV === 'test'
     ? 'postgres://localhost/smartdrop_test'
@@ -85,11 +96,15 @@ const env = cleanEnv(rawEnv, {
   // hex or base64 encoded. Empty in dev — webhookEncryption falls back to an
   // insecure fixed key and logs a warning; production must set this.
   WEBHOOK_SECRET_ENCRYPTION_KEY: str({ default: '' }),
+  DB_ENCRYPTION_KEY: str({ default: '' }),
   AIRDROP_CSV_MAX_BYTES: positiveInteger({ default: 5 * 1024 * 1024 }),
   AIRDROP_JSON_MAX_BYTES: positiveInteger({ default: 2 * 1024 * 1024 }),
   AIRDROP_RATELIMIT_WINDOW: positiveInteger({ default: 60 }),
   AIRDROP_RATELIMIT_MAX: positiveInteger({ default: 10 }),
   CORS_MAX_AGE_SECONDS: positiveInteger({ default: 86400 }),
+  STATIC_ASSETS_DIR: str({ default: 'public' }),
+  STATIC_CDN_URL: optionalHttpUrl({ default: '' }),
+  STATIC_ASSETS_MAX_AGE_SECONDS: positiveInteger({ default: 31536000 }),
   PRICE_CACHE_TTL_SECONDS: num({ default: 60 }),
   PRICE_REFRESH_INTERVAL_SECONDS: num({ default: 30 }),
   PRICE_STALE_THRESHOLD_MINUTES: num({ default: 5 }),
@@ -142,6 +157,14 @@ const parsedWatchedAssets = Array.isArray(env.WATCHED_ASSETS)
 const config = module.exports = {
   nodeEnv: env.NODE_ENV,
   port: env.PORT,
+  apiDocs: {
+    enabled: process.env.API_DOCS_ENABLED !== 'false',
+  },
+  staticAssets: {
+    directory: path.resolve(env.STATIC_ASSETS_DIR),
+    cdnBaseUrl: env.STATIC_CDN_URL,
+    maxAgeSeconds: env.STATIC_ASSETS_MAX_AGE_SECONDS,
+  },
   databaseUrl: env.DATABASE_URL,
   redis: {
     url: env.REDIS_URL,
@@ -245,6 +268,8 @@ const config = module.exports = {
   slowRequestThresholdMs: env.SLOW_REQUEST_THRESHOLD_MS,
   routeTimeoutMs: env.ROUTE_TIMEOUT_MS,
   webhookSecretEncryptionKey: env.WEBHOOK_SECRET_ENCRYPTION_KEY,
+  databaseEncryptionKey: env.DB_ENCRYPTION_KEY,
+  dbEncryptionKey: env.DB_ENCRYPTION_KEY,
   // How long browsers may cache a CORS preflight response (issue #344).
   // Exposed as Access-Control-Max-Age on every successful OPTIONS preflight.
   corsMaxAgeSeconds: env.CORS_MAX_AGE_SECONDS,
@@ -340,11 +365,15 @@ function reload() {
     LEASE_RENEW_INTERVAL_MS: positiveInteger({ default: 5000 }),
     ADMIN_API_KEY: str({ default: '' }),
     WEBHOOK_SECRET_ENCRYPTION_KEY: str({ default: '' }),
+    DB_ENCRYPTION_KEY: str({ default: '' }),
     AIRDROP_CSV_MAX_BYTES: positiveInteger({ default: 5 * 1024 * 1024 }),
     AIRDROP_JSON_MAX_BYTES: positiveInteger({ default: 2 * 1024 * 1024 }),
     AIRDROP_RATELIMIT_WINDOW: positiveInteger({ default: 60 }),
     AIRDROP_RATELIMIT_MAX: positiveInteger({ default: 10 }),
     CORS_MAX_AGE_SECONDS: positiveInteger({ default: 86400 }),
+    STATIC_ASSETS_DIR: str({ default: 'public' }),
+    STATIC_CDN_URL: optionalHttpUrl({ default: '' }),
+    STATIC_ASSETS_MAX_AGE_SECONDS: positiveInteger({ default: 31536000 }),
     PRICE_CACHE_TTL_SECONDS: num({ default: 60 }),
     PRICE_REFRESH_INTERVAL_SECONDS: num({ default: 30 }),
     PRICE_STALE_THRESHOLD_MINUTES: num({ default: 5 }),
@@ -390,6 +419,14 @@ function reload() {
   Object.assign(config, {
     nodeEnv: reloaded.NODE_ENV,
     port: reloaded.PORT,
+    apiDocs: {
+      enabled: process.env.API_DOCS_ENABLED !== 'false',
+    },
+    staticAssets: {
+      directory: path.resolve(reloaded.STATIC_ASSETS_DIR),
+      cdnBaseUrl: reloaded.STATIC_CDN_URL,
+      maxAgeSeconds: reloaded.STATIC_ASSETS_MAX_AGE_SECONDS,
+    },
     databaseUrl: reloaded.DATABASE_URL,
     redis: { url: reloaded.REDIS_URL },
     stellar: {
@@ -412,6 +449,8 @@ function reload() {
     slowRequestThresholdMs: reloaded.SLOW_REQUEST_THRESHOLD_MS,
     routeTimeoutMs: reloaded.ROUTE_TIMEOUT_MS,
     webhookSecretEncryptionKey: reloaded.WEBHOOK_SECRET_ENCRYPTION_KEY,
+    databaseEncryptionKey: reloaded.DB_ENCRYPTION_KEY,
+    dbEncryptionKey: reloaded.DB_ENCRYPTION_KEY,
     corsMaxAgeSeconds: reloaded.CORS_MAX_AGE_SECONDS,
     watchedAssets: reloadedWatchedAssets,
     webhooks: {

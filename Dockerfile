@@ -23,6 +23,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY src ./src
+COPY openapi.yaml ./
+COPY public ./public
 
 # --- Production Stage ---
 FROM node:20-alpine AS production
@@ -33,6 +35,8 @@ ENV TZ=UTC
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/openapi.yaml ./
+COPY --from=builder /app/public ./public
 COPY package*.json ./
 
 EXPOSE 4000
