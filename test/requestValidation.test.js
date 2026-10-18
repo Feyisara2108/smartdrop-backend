@@ -32,10 +32,9 @@ describe('requestValidation', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  test('rejects requests without a content type', async () => {
+  test('allows bodyless requests without a content type', async () => {
     const res = await request(buildApp()).post('/api/v1/airdrops');
 
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.status).toBe(204);
   });
 });
