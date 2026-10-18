@@ -124,6 +124,14 @@ const env = cleanEnv(rawEnv, {
   API_KEY_RATELIMIT_FREE_MAX: positiveInteger({ default: 100 }),
   API_KEY_RATELIMIT_PRO_MAX: positiveInteger({ default: 1000 }),
   API_KEY_RATELIMIT_ADMIN_MAX: positiveInteger({ default: 10000 }),
+  // Issue #495 — cache warming startup behavior
+  CACHE_WARM_ENABLED: str({ default: 'true' }),
+  CACHE_WARM_TIMEOUT_MS: num({ default: 30000 }),
+  CACHE_WARM_ENTRY_TIMEOUT_MS: num({ default: 10000 }),
+  CACHE_WARM_MAX_ENTRIES: num({ default: 500 }),
+  CACHE_WARM_CONCURRENCY: num({ default: 8 }),
+  CACHE_WARM_JITTER_MS: num({ default: 0 }),
+  CACHE_WARM_LOCK_TTL_MS: num({ default: 60000 }),
 });
 
 const usdcIssuer = env.USDC_ISSUER;
@@ -286,6 +294,15 @@ const config = module.exports = {
     maxConnections: parseInt(process.env.WS_MAX_CONNECTIONS, 10) || 100,
     maxConnectionsPerIp: parseInt(process.env.WS_MAX_CONNECTIONS_PER_IP, 10) || 5,
   },
+  cacheWarm: {
+    enabled: (process.env.CACHE_WARM_ENABLED || 'true').toLowerCase() !== 'false',
+    timeoutMs: parseInt(process.env.CACHE_WARM_TIMEOUT_MS, 10) || 30000,
+    entryTimeoutMs: parseInt(process.env.CACHE_WARM_ENTRY_TIMEOUT_MS, 10) || 10000,
+    maxEntries: parseInt(process.env.CACHE_WARM_MAX_ENTRIES, 10) || 500,
+    concurrency: parseInt(process.env.CACHE_WARM_CONCURRENCY, 10) || 8,
+    jitterMs: parseInt(process.env.CACHE_WARM_JITTER_MS, 10) || 0,
+    lockTtlMs: parseInt(process.env.CACHE_WARM_LOCK_TTL_MS, 10) || 60000,
+  },
 };
 
 
@@ -338,11 +355,19 @@ function reload() {
     SLOW_REQUEST_THRESHOLD_MS: num({ default: 1000 }),
     ROUTE_TIMEOUT_MS: num({ default: 30000 }),
     API_KEY_RATELIMIT_WINDOW_SECONDS: positiveInteger({ default: 60 }),
-    API_KEY_RATELIMIT_FREE_MAX: positiveInteger({ default: 100 }),
-    API_KEY_RATELIMIT_PRO_MAX: positiveInteger({ default: 1000 }),
-    API_KEY_RATELIMIT_ADMIN_MAX: positiveInteger({ default: 10000 }),
-    BCRYPT_ROUNDS: positiveInteger({ default: 12 }),
-  });
+  API_KEY_RATELIMIT_FREE_MAX: positiveInteger({ default: 100 }),
+  API_KEY_RATELIMIT_PRO_MAX: positiveInteger({ default: 1000 }),
+  API_KEY_RATELIMIT_ADMIN_MAX: positiveInteger({ default: 10000 }),
+  BCRYPT_ROUNDS: positiveInteger({ default: 12 }),
+  CACHE_WARM_ENABLED: str({ default: 'true' }),
+  CACHE_WARM_TIMEOUT_MS: num({ default: 30000 }),
+  CACHE_WARM_ENTRY_TIMEOUT_MS: num({ default: 10000 }),
+  CACHE_WARM_MAX_ENTRIES: num({ default: 500 }),
+  CACHE_WARM_CONCURRENCY: num({ default: 8 }),
+  CACHE_WARM_JITTER_MS: num({ default: 0 }),
+  CACHE_WARM_LOCK_TTL_MS: num({ default: 60000 }),
+});
+
 
   const reloadedUsdcIssuer = reloaded.USDC_ISSUER;
   const reloadedWatchedAssets = Array.isArray(reloaded.WATCHED_ASSETS)
@@ -378,14 +403,25 @@ function reload() {
     corsMaxAgeSeconds: reloaded.CORS_MAX_AGE_SECONDS,
     watchedAssets: reloadedWatchedAssets,
     webhooks: {
-      ...config.webhooks,
-      maxAttempts: parseInt(process.env.WEBHOOK_MAX_ATTEMPTS, 10) || 3,
-      retryBaseMs: parseInt(process.env.WEBHOOK_RETRY_BASE_MS, 10) || 30000,
-      retryFactor: parseFloat(process.env.WEBHOOK_RETRY_FACTOR) || 2,
-      timeoutMs: parseInt(process.env.WEBHOOK_TIMEOUT_MS, 10) || 5000,
-    },
-    LOG_LEVEL: reloaded.LOG_LEVEL,
-  });
+    ...config.webhooks,
+    maxAttempts: parseInt(process.env.WEBHOOK_MAX_ATTEMPTS, 10) || 3,
+    retryBaseMs: parseInt(process.env.WEBHOOK_RETRY_BASE_MS, 10) || 30000,
+    retryFactor: parseFloat(process.env.WEBHOOK_RETRY_FACTOR) || 2,
+    timeoutMs: parseInt(process.env.WEBHOOK_TIMEOUT_MS, 10) || 5000,
+  },
+  cacheWarm: {
+    ...config.cacheWarm,
+    enabled: (process.env.CACHE_WARM_ENABLED || 'true').toLowerCase() !== 'false',
+    timeoutMs: parseInt(process.env.CACHE_WARM_TIMEOUT_MS, 10) || 30000,
+    entryTimeoutMs: parseInt(process.env.CACHE_WARM_ENTRY_TIMEOUT_MS, 10) || 10000,
+    maxEntries: parseInt(process.env.CACHE_WARM_MAX_ENTRIES, 10) || 500,
+    concurrency: parseInt(process.env.CACHE_WARM_CONCURRENCY, 10) || 8,
+    jitterMs: parseInt(process.env.CACHE_WARM_JITTER_MS, 10) || 0,
+    lockTtlMs: parseInt(process.env.CACHE_WARM_LOCK_TTL_MS, 10) || 60000,
+  },
+  LOG_LEVEL: reloaded.LOG_LEVEL,
+});
+
 
   return config;
 }

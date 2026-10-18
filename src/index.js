@@ -21,7 +21,7 @@ const webhookRetryWorker = require("./jobs/webhookRetryWorker");
 const airdropExpiryJob = require("./jobs/airdropExpiry");
 const { createLeaderElection } = require("./services/leaderElection");
 const { makeLeaderAwareJob } = require("./jobs/leaderAwareJob");
-const { warmCache } = require("./startup/cacheWarm");
+const { warmCacheInBackground, getWarmStatus } = require("./startup/cacheWarm");
 const buildCorsMiddleware = require("./middleware/cors");
 const {
   buildRateLimit,
@@ -219,6 +219,9 @@ app.get("/health", healthRateLimit, async (req, res) => {
       draining: subscriptionManager.isDraining,
       drain_stats: subscriptionManager.drainStats,
     },
+    // Issue #495 — cache warm status is an optimization, not a readiness
+    // dependency (warming runs in the background).
+    cache_warm: getWarmStatus(),
     jobs: {
       price_refresh: {
         healthy: priceRefreshHealth.healthy,
@@ -499,13 +502,24 @@ async function startServer() {
     );
   }
 
-  try {
-    await warmCache(config.watchedAssets);
-  } catch (err) {
+  // Issue #495 — do NOT block listen on cache warming. Warm in the
+  // background with bounding (max entries, concurrency, per-entry timeout),
+  // Redis lock so only one replica warms at a time, jitter and TTL.
+  // The server can accept traffic immediately; /health exposes cache_warm.
+  warmCacheInBackground({
+    assets: config.watchedAssets,
+    timeoutMs: config.cacheWarm.timeoutMs,
+    entryTimeoutMs: config.cacheWarm.entryTimeoutMs,
+    maxEntries: config.cacheWarm.maxEntries,
+    concurrency: config.cacheWarm.concurrency,
+    jitterMs: config.cacheWarm.jitterMs,
+    lockTtlMs: config.cacheWarm.lockTtlMs,
+    enabled: config.cacheWarm.enabled,
+  }).catch((err) => {
     logger.warn("Cache warm failed; starting server anyway", {
       error: err.message,
     });
-  }
+  });
 
   server = app.listen(config.port, () => {
     logStartupBanner();
