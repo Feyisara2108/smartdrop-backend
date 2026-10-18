@@ -289,6 +289,11 @@ const config = module.exports = {
       max: parseInt(process.env.WEBHOOK_TEST_RATELIMIT_MAX, 10) || 5,
     },
     orderedDelivery: process.env.WEBHOOK_ORDERED_DELIVERY === 'true',
+    shutdownDrainMs: parseInt(process.env.WEBHOOK_RETRY_SHUTDOWN_DRAIN_MS, 10) || 2000,
+    leaseMs: parseInt(process.env.WEBHOOK_RETRY_LEASE_MS, 10) || 300000,
+    recoverBatch: parseInt(process.env.WEBHOOK_RETRY_RECOVER_BATCH, 10) || 100,
+    dlqMax: parseInt(process.env.WEBHOOK_DLQ_MAX, 10) || 10000,
+    deliveryTtlSeconds: parseInt(process.env.WEBHOOK_DELIVERY_TTL_SECONDS, 10) || 2592000,
   },
   ws: {
     maxConnections: parseInt(process.env.WS_MAX_CONNECTIONS, 10) || 100,
