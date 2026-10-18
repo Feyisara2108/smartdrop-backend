@@ -13,13 +13,24 @@ let db = null;
  * @param {Object} [overrideConfig] - Optional configuration overrides (useful for testing)
  * @returns {import('knex').Knex}
  */
+// Issue #494 — every timestamp column is TIMESTAMPTZ, and all application
+// code stores/compares UTC. Pinning the session TimeZone to UTC as well means
+// anything the database renders itself in a text form (to_char, ::date,
+// CURRENT_TIMESTAMP without a zone, a query typed by hand) is UTC too, rather
+// than following the server's local zone. A pool `afterCreate` hook runs for
+// every pooled connection, not just the first.
+function afterCreateUtcConnection(conn, done) {
+  conn.query("SET TIME ZONE 'UTC'", (err) => done(err, conn));
+}
+
 function getDb(overrideConfig = {}) {
   if (!db) {
+    const pool = { min: 2, max: 10, afterCreate: afterCreateUtcConnection, ...(overrideConfig.pool || {}) };
     db = knexFactory({
       client: 'pg',
       connection: overrideConfig.connection || config.databaseUrl,
-      pool: overrideConfig.pool || { min: 2, max: 10 },
       ...overrideConfig,
+      pool,
     });
   }
   return db;
@@ -105,4 +116,6 @@ module.exports = {
   sortIds,
   lockRows,
   isDeadlockOrSerializationError,
+  // Exported for tests (#494) — the per-connection UTC pin.
+  afterCreateUtcConnection,
 };
