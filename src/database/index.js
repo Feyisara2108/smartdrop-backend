@@ -2,7 +2,14 @@
 
 const knexFactory = require('knex');
 const config = require('../config');
-const { withTransaction } = require('./transaction');
+const {
+  withTransaction,
+  sortIds,
+  lockRows,
+  isDeadlockOrSerializationError,
+} = require('./transaction');
+const encryption = require('./encryption');
+const { PoolMonitor, defaultPoolMonitor } = require('./poolMonitor');
 const logger = require('../logger');
 
 let db = null;
@@ -21,6 +28,7 @@ function getDb(overrideConfig = {}) {
       pool: overrideConfig.pool || { min: 2, max: 10 },
       ...overrideConfig,
     });
+    defaultPoolMonitor.attach(db);
   }
   return db;
 }
@@ -32,6 +40,11 @@ function getDb(overrideConfig = {}) {
  */
 function setDb(instance) {
   db = instance;
+  if (db) {
+    defaultPoolMonitor.attach(db);
+  } else {
+    defaultPoolMonitor.detach();
+  }
 }
 
 /**
@@ -39,6 +52,7 @@ function setDb(instance) {
  */
 async function closeDb() {
   if (db) {
+    defaultPoolMonitor.detach();
     await db.destroy();
     db = null;
   }
@@ -65,21 +79,40 @@ async function withConnection(callback) {
 }
 
 /**
- * Get current pool statistics for monitoring connection usage (#488).
+ * Get current pool statistics for monitoring connection usage (#488, #520).
  *
- * @returns {Object} Pool stats
+ * @returns {Object} Pool stats with utilization metrics
  */
 function getPoolStats() {
   const currentDb = getDb();
   const pool = currentDb.client.pool;
+  const snapshot = defaultPoolMonitor.getSnapshot() || {};
   return {
-    min: pool.min,
-    max: pool.max,
-    used: pool.numUsed(),
-    free: pool.numFree(),
-    pendingAcquires: pool.numPendingAcquires(),
-    pendingCreates: pool.numPendingCreates(),
+    min: pool ? pool.min : 0,
+    max: pool ? pool.max : 10,
+    used: pool && typeof pool.numUsed === 'function' ? pool.numUsed() : (snapshot.used ?? 0),
+    free: pool && typeof pool.numFree === 'function' ? pool.numFree() : (snapshot.free ?? 0),
+    pendingAcquires:
+      pool && typeof pool.numPendingAcquires === 'function'
+        ? pool.numPendingAcquires()
+        : (snapshot.pendingAcquires ?? 0),
+    pendingCreates:
+      pool && typeof pool.numPendingCreates === 'function'
+        ? pool.numPendingCreates()
+        : (snapshot.pendingCreates ?? 0),
+    utilization: snapshot.utilization ?? 0,
+    saturation: snapshot.saturation ?? 0,
+    status: snapshot.status ?? 'healthy',
   };
+}
+
+/**
+ * Get full connection pool metrics, including counters and latency timing (#520).
+ *
+ * @returns {Object}
+ */
+function getPoolMetrics() {
+  return defaultPoolMonitor.getMetrics();
 }
 
 /**
@@ -100,9 +133,26 @@ module.exports = {
   closeDb,
   withConnection,
   getPoolStats,
+  getPoolMetrics,
+  PoolMonitor,
+  defaultPoolMonitor,
   withTransaction,
   transaction,
   sortIds,
   lockRows,
   isDeadlockOrSerializationError,
+  // Encryption at rest (#519)
+  encryption,
+  encrypt: encryption.encrypt,
+  decrypt: encryption.decrypt,
+  isEncrypted: encryption.isEncrypted,
+  encryptRecord: encryption.encryptRecord,
+  decryptRecord: encryption.decryptRecord,
+  encryptRow: encryption.encryptRow,
+  decryptRow: encryption.decryptRow,
+  encryptFields: encryption.encryptFields,
+  decryptFields: encryption.decryptFields,
+  encryptRows: encryption.encryptRows,
+  decryptRows: encryption.decryptRows,
+  hashBlindIndex: encryption.hashBlindIndex,
 };
