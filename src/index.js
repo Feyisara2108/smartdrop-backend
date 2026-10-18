@@ -11,6 +11,7 @@ const priceOracle = require("./services/priceOracle");
 const priceRefreshJob = require("./jobs/priceRefresh");
 const webhookRetryWorker = require("./jobs/webhookRetryWorker");
 const airdropExpiryJob = require("./jobs/airdropExpiry");
+const jobQueue = require("./services/jobQueue");
 const { createLeaderElection } = require("./services/leaderElection");
 const { makeLeaderAwareJob } = require("./jobs/leaderAwareJob");
 const { warmCache } = require("./startup/cacheWarm");
@@ -386,6 +387,7 @@ function shutdown(signal) {
 
     // Stop non-leader-elected services
     await indexerPoller.stop();
+    jobQueue.stop();
 
     // Gracefully drain WebSocket connections: broadcast close frame,
     // then force-close any still open after the drain timeout (issue #248).
@@ -500,6 +502,9 @@ async function startServer() {
     // Indexer poller is not leader-elected (it uses its own cursor-based
     // persistence in Redis and is safe for multiple replicas to run).
     indexerPoller.start();
+
+    // #510 — start async job queue for background task processing
+    jobQueue.start();
   });
 
   return server;
